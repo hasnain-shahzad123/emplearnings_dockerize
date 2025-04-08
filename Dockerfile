@@ -35,7 +35,7 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 # Set the STRIPE_SECRET_KEY here
-ENV STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
+ENV STRIPE_SECRET_KEY=sk_test_51QFGgEDnILlRGaJl2VIlpkKe7YXoSNPgVyilFifbZwJ8BjxDqgrFS1lqSUVSEg5jvRejdjKhAByzk6LbNvVjQsWU008C0CmXtE
 
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
