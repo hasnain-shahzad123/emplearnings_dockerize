@@ -1,23 +1,25 @@
+export const dynamic = "force-dynamic";
+
 import { stripe } from "@/lib/stripe";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(req: NextRequest) {
   try {
-    //get subscription plan id and user email and uid from the req body
     const { planId, email, uid } = await req.json();
 
-    //validations
-    if (email === null || email === undefined) {
+    if (!email) {
       return NextResponse.json(
         { message: "Please provide an email address." },
         { status: 400 }
       );
-    } else if (uid === undefined || uid === null) {
+    }
+    if (!uid) {
       return NextResponse.json(
         { message: "Please provide a user id." },
         { status: 400 }
       );
-    } else if (planId === null || planId === undefined) {
+    }
+    if (!planId) {
       return NextResponse.json(
         { message: "Please provide a plan id." },
         { status: 400 }
@@ -46,32 +48,24 @@ export async function POST(req: NextRequest) {
 
     const registrationFeeId = process.env.STRIPE_REGISTRATION_FEE_PRICE_ID;
 
-    // Creating a Stripe customer with the user details
     const customer = await stripe.customers.create({
       email: email,
       metadata: { uid: uid },
     });
 
-    // Creating the Checkout Session
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ["card"],
       mode: "subscription",
-      customer: customer.id, // Newly created customer
+      customer: customer.id,
       line_items: [
-        {
-          price: subscriptionPlanId, // The subscription plan price ID
-          quantity: 1,
-        },
-        {
-          price: registrationFeeId, //One time registration fees price id
-          quantity: 1,
-        },
+        { price: subscriptionPlanId, quantity: 1 },
+        { price: registrationFeeId!, quantity: 1 },
       ],
       subscription_data: {
-        trial_period_days: 30, //  30-day free trial period
+        trial_period_days: 30,
       },
-      success_url: process.env.NEXT_PUBLIC_URL + `/mentor-dashboard/${uid}`, // Redirect URL on success
-      cancel_url: process.env.NEXT_PUBLIC_URL + "/failed", // Redirect URL on cancel
+      success_url: `${process.env.NEXT_PUBLIC_URL}/mentor-dashboard/${uid}`,
+      cancel_url: `${process.env.NEXT_PUBLIC_URL}/failed`,
     });
 
     return NextResponse.json({ id: session.id }, { status: 200 });
