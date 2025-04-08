@@ -1,0 +1,318 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Disallow all operations by default
+    match /{document=**} {
+      allow read, write: if false;
+    }
+    
+    // Rules for TUTORS Collection
+    match /TUTORS/{docID} {
+      allow read: if isSignedIn() && (isTutor() || isAdmin() || isStudent());
+      allow create: if isSignedIn() && isCreateTutorsAllowed(docID) && UserManagesOnlyHisDocument(docID) && isTutor() && tutorDoesNotAlreadyExist();
+      allow update: if isSignedIn() && (UserManagesOnlyHisDocument(docID) || isAdmin()) && (isTutor() || isAdmin()) && isUpdateTutorsAllowed();
+      allow delete: if isSignedIn() && isAdmin();
+    }
+
+    // Rules for DEMO_ANSWERS Collection
+    match /DEMO_ANSWERS/{docID} {
+      allow read: if isSignedIn() && isAdmin();
+      allow create: if isDemoAnswerCreateAllowed(docID);
+      allow update: if false;
+      allow delete: if isSignedIn() && isAdmin();
+    }
+
+    // Rules for TUTOR_NOTIFICATIONS Collection
+    match /TUTORS/{uid}/TUTOR_NOTIFICATIONS/{docID} {
+      allow read: if isSignedIn() && isTutor() && UserManagesOnlyHisDocument(uid);
+      allow create: if isSignedIn() && isTutor() && UserManagesOnlyHisDocument(uid) && isTutorNotificationCreateAllowed(docID);
+      allow update: if isSignedIn() && (isTutor() || isAdmin()) && UserManagesOnlyHisDocument(uid) && isTutorNotificationUpdateAllowed();
+      allow delete: if isSignedIn() && (isTutor()) && UserManagesOnlyHisDocument(uid);
+    }
+
+    // Rules for TUTOR_EDUCATION Collection
+    match /TUTORS/{uid}/TUTOR_EDUCATION/{docID} {
+      allow read: if isSignedIn() && (isTutor() || isAdmin() || isStudent());
+      allow create: if isSignedIn() && isTutor() && UserManagesOnlyHisDocumentSUB(uid,docID) && isTutorEducationCreateAllowed();
+      allow update: if isSignedIn() && (isTutor()) && UserManagesOnlyHisDocumentSUB(uid,docID) && isTutorEducationUpdateAllowed();
+      allow delete: if false;
+    }
+
+    // Rules for TUTOR_EDUCATION Collection
+    match /TUTORS/{uid}/TUTOR_CERTIFICATIONS/{docID} {
+      allow read: if isSignedIn() && (isTutor() || isAdmin() || isStudent());
+      allow create: if isSignedIn() && isTutor() && UserManagesOnlyHisDocumentSUB(uid,docID) && isTutorCertificationCreateAllowed();
+      allow update: if isSignedIn() && (isTutor()) && UserManagesOnlyHisDocumentSUB(uid,docID) && isTutorEducationUpdateAllowed();
+      allow delete: if false;
+    }
+    
+    // General Utility functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function getIncomingData() {
+      return request.resource.data;
+    }
+
+    function getExistingData() {
+      return resource.data;
+    }
+
+    function isTutor() {
+      return request.auth.token.role=="tutor";
+    }
+
+    function isStudent() {
+      return request.auth.token.role=="student";
+    }
+
+    function isAdmin() {
+      return request.auth.token.role=="admin";
+    }
+
+    function UserManagesOnlyHisDocument(docID) {
+      return request.auth.uid == docID;
+    }
+
+    function UserManagesOnlyHisDocumentSUB(uid,docID) {
+      return request.auth.uid == docID && request.auth.uid == uid;
+    }
+
+    function tutorDoesNotAlreadyExist() {
+      return !exists(/databases/$(database)/documents/TUTORS/$(request.auth.uid))
+    }
+
+    // Function for TUTORS collection
+   
+    //CREATE 
+    function isCreateTutorsAllowed(docID) {
+      let incomingData = getIncomingData();
+      let requiredFields = ['username', 'email', 'uid',"total_students","active_students","completed_lessons","pending_lessons","total_reviews","rating","profilePhotoURL","per_lesson_rate","free_trail_lesson_enable","country","languages","categories","number_of_reviews","tagline","about","experience_years","plan_type","subscription_status","pending_categories"];
+      let hasAllRequiredData = incomingData.keys().hasAll(requiredFields);
+      let hasNoExtraData = incomingData.keys().hasOnly(requiredFields);
+      let docIdMatchesUid = docID == incomingData.uid;
+      let areAllValidTypes = (incomingData.uid is string) && (incomingData.username is string) && (incomingData.email is string) && (incomingData.total_students is number) && (incomingData.active_students is number) && (incomingData.completed_lessons is number) && (incomingData.pending_lessons is number) && (incomingData.total_reviews is number) && (incomingData.rating is number) && (incomingData.profilePhotoURL is string) && (incomingData.per_lesson_rate is number) && (incomingData.free_trail_lesson_enable is bool) && (incomingData.country is string) && (incomingData.languages is list) && (incomingData.categories is list) && (incomingData.number_of_reviews is number) && (incomingData.tagline is string) && (incomingData.about is string) && (incomingData.experience_years is number) && (incomingData.plan_type is string) && (incomingData.subscription_status is string) && (incomingData.pending_categories is list);
+      
+        let isValidAttributesSize = 
+    incomingData.uid.size() > 5 && incomingData.username.size() > 0 && 
+    incomingData.email.size() > 12 && incomingData.email.size() < 40 && 
+    incomingData.username.size() < 30 && incomingData.uid.size() < 30 && 
+    incomingData.total_students >= 0 && incomingData.active_students >= 0 &&
+    incomingData.completed_lessons >= 0 && incomingData.pending_lessons >= 0 &&
+    incomingData.total_reviews >= 0 && incomingData.rating >= 0 && incomingData.rating <= 5 &&
+    incomingData.profilePhotoURL.size() >= 0 && incomingData.profilePhotoURL.size() < 500 &&
+    incomingData.per_lesson_rate >= 0 && incomingData.per_lesson_rate <= 1000 &&
+    incomingData.country.size() >= 0 && incomingData.country.size() <= 50 &&
+    incomingData.languages.size() >= 0 && incomingData.languages.size() < 20 &&
+    incomingData.categories.size() >= 0 && incomingData.categories.size() < 20 &&
+    incomingData.number_of_reviews >= 0 && incomingData.number_of_reviews < 1000 &&
+    incomingData.tagline.size() >= 0 && incomingData.tagline.size() < 300 &&
+    incomingData.about.size() >= 0 && incomingData.about.size() < 2000 &&
+    incomingData.experience_years >= 0 && incomingData.experience_years < 100 &&
+    incomingData.plan_type.size() > 0 && incomingData.plan_type.size() < 50 &&
+    incomingData.subscription_status.size() > 0 && incomingData.subscription_status.size() < 50 &&
+    incomingData.pending_categories.size() >= 0 && incomingData.pending_categories.size() < 20;
+
+
+       return hasAllRequiredData && hasNoExtraData && docIdMatchesUid && areAllValidTypes && isValidAttributesSize;
+    }
+    
+    //UPDATE Tutors
+    function isUpdateTutorsAllowed() {
+      let incomingData = getIncomingData();
+
+      let validAttributes = request.resource.data.diff(resource.data).affectedKeys().hasOnly(['username', "email", "tagline", "about", "languages","profilePhotoURL","experience_years"]);
+
+      let isUsernameValid=incomingData.keys().hasAny(["username"]) ? 
+        incomingData.username is string && incomingData.username.size() >= 0 && incomingData.username.size() < 50 : true;
+
+      let isEmailValid=incomingData.keys().hasAny(["email"]) ? 
+        incomingData.email is string && incomingData.email.size() >= 0 && incomingData.email.size() < 50 : true;
+        
+      let isTaglineValid = incomingData.keys().hasAny(["tagline"]) ? 
+        incomingData.tagline is string && incomingData.tagline.size() >= 0 && incomingData.tagline.size() < 300 : true;
+
+      let isAboutValid = incomingData.keys().hasAny(["about"]) ? 
+        incomingData.about is string && incomingData.about.size() >= 0 && incomingData.about.size() < 2000 : true;
+      
+      let isLanguagesValid = incomingData.keys().hasAny(["languages"]) ? 
+        (incomingData.languages is list && 
+        incomingData.languages.size() >= 0 && 
+        incomingData.languages.size() < 20 &&
+        (incomingData.languages.toSet().size() == incomingData.languages.size())
+        ) : true;
+
+      let isProfilePhotoURLValid = incomingData.keys().hasAny(["profilePhotoURL"]) ? 
+        incomingData.profilePhotoURL is string && incomingData.profilePhotoURL.size() >= 0 && incomingData.profilePhotoURL.size() < 1000 : true;  
+
+      let isExperienceYearsValid = incomingData.keys().hasAny(["experience_years"]) ? 
+        incomingData.experience_years is number && incomingData.experience_years >= 0 && incomingData.experience_years < 60 : true;  
+
+  
+      
+      return validAttributes && isUsernameValid && isEmailValid && isTaglineValid && isAboutValid && isLanguagesValid && isProfilePhotoURLValid && isExperienceYearsValid;
+    }
+
+    // Functions for DEMO_ANSWERS collection
+    function isDemoAnswerCreateAllowed(docID) {
+      let incomingData = getIncomingData();
+      let requiredFields = ['uid', 'email', 'answers', 'time'];
+      let hasAllRequiredData = incomingData.keys().hasAll(requiredFields);
+      let hasNoExtraData = incomingData.keys().hasOnly(requiredFields);
+
+      // Check if uid matches the docID
+      let docIdMatchesUid = docID == incomingData.uid;
+
+      // Validate data types
+      let areTypesValid = 
+        (incomingData.uid is string) &&
+        (incomingData.email is string) &&
+        (incomingData.answers is map) &&
+        (incomingData.time is timestamp);
+
+      // Validate answers structure and size
+      let validAnswersKeys = incomingData.answers.keys().hasOnly(['question_1', 'question_2', 'question_3', 'question_4']);
+      let validAnswersSize = incomingData.answers.size() == 4;
+
+      // Validate field sizes
+      let isValidAttributesSize = 
+        incomingData.uid.size() >= 4 && incomingData.uid.size() < 30 &&
+        incomingData.email.size() > 6 && incomingData.email.size() < 40;
+
+      return hasAllRequiredData &&
+             hasNoExtraData &&
+             docIdMatchesUid &&
+             areTypesValid &&
+             validAnswersKeys &&
+             validAnswersSize &&
+             isValidAttributesSize;
+    }
+
+    // Functions for TUTOR_NOTIFICATIONS collection
+
+    // CREATE
+    function isTutorNotificationCreateAllowed(docID) {
+      let incomingData = getIncomingData();
+      let requiredFields = ['notification', 'time', 'read','uid'];
+      let hasNoExtraData = incomingData.keys().hasOnly(requiredFields);
+    
+      // Validate data types
+      let areTypesValid = 
+        (incomingData.notification is string) &&
+        (incomingData.time is timestamp) &&
+        (incomingData.read is bool) &&
+        (incomingData.uid is string);
+       
+      // Validate field sizes
+      let isValidAttributesSize = 
+        (incomingData.notification.size() > 0 && incomingData.notification.size() < 500) &&
+        (incomingData.uid.size() > 0 && incomingData.uid.size() < 60);
+      
+      let isUidValid= incomingData.uid == docID;
+
+      return hasNoExtraData &&
+             areTypesValid &&
+             isValidAttributesSize &&
+             isUidValid;
+    }
+
+    // UPDATE
+    function isTutorNotificationUpdateAllowed() {
+      let incomingData = getIncomingData();
+      let validAttributes = request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']);
+
+      let isReadValid = incomingData.keys().hasAny(["read"]) ? 
+        incomingData.read is bool : true;
+
+      return validAttributes && isReadValid;
+    }
+
+
+    //Functions for TUTOR_EDUCATION collection
+
+// CREATE
+function isTutorEducationCreateAllowed() {
+  let incomingData = getIncomingData();
+  let requiredFields = ['highest_degree', 'graduation_year', 'institution_name', 'is_verified', 'field_of_study'];
+  let hasNoExtraData = incomingData.keys().hasOnly(requiredFields);
+
+  // Validate data types
+  let areTypesValid = 
+    (incomingData.highest_degree is string) &&
+    (incomingData.graduation_year is number) &&
+    (incomingData.institution_name is string) &&
+    (incomingData.is_verified is bool) &&
+    (incomingData.field_of_study is string);
+   
+  // Validate field sizes
+  let isValidAttributesSize = 
+    (incomingData.highest_degree.size() >= 0 && incomingData.highest_degree.size()<=50) &&
+    (incomingData.graduation_year >= 0 && incomingData.graduation_year < 3000) &&
+    (incomingData.institution_name.size() >= 0 && incomingData.institution_name.size()<=50) &&
+    (incomingData.field_of_study.size() >= 0 && incomingData.institution_name.size()<=40);
+
+  return hasNoExtraData &&
+         areTypesValid &&
+         isValidAttributesSize;
+}
+
+
+    //UPDATE
+    function isTutorEducationUpdateAllowed() {
+      let incomingData = getIncomingData();
+      let validAttributes = request.resource.data.diff(resource.data).affectedKeys().hasOnly(['highest_degree', 'graduation_year', 'institution_name', 'is_verified',"field_of_study"]);
+
+      let isHighestDegreeValid = incomingData.keys().hasAny(["highest_degree"]) ? 
+        incomingData.highest_degree is string && incomingData.highest_degree.size() >= 0 && incomingData.highest_degree.size() < 50 : true;
+
+      let isGraduationYearValid = incomingData.keys().hasAny(["graduation_year"]) ? 
+        incomingData.graduation_year is number && incomingData.graduation_year >= 0 && incomingData.graduation_year < 10000 : true;
+
+      let isInstitutionNameValid = incomingData.keys().hasAny(["institution_name"]) ? 
+        incomingData.institution_name is string && incomingData.institution_name.size() >= 0 && incomingData.institution_name.size() < 50 : true;
+
+      let isFieldOfStudyValid = incomingData.keys().hasAny(["field_of_study"]) ? 
+        incomingData.field_of_study is string && incomingData.field_of_study.size() >= 0 && incomingData.field_of_study.size() < 50 : true;
+
+      let isVerifiedValid = incomingData.keys().hasAny(["is_verified"]) ? 
+        incomingData.is_verified is bool : true;  
+
+      return validAttributes && isHighestDegreeValid && isGraduationYearValid && isInstitutionNameValid && isFieldOfStudyValid && isVerifiedValid;
+    }
+
+    //Functions for TUTOR_CERTIFICATIONS collection
+
+// CREATE
+function isTutorCertificationsCreateAllowed() {
+  let incomingData = getIncomingData();
+  let requiredFields = ['certifications'];
+  let hasNoExtraData = incomingData.keys().hasOnly(requiredFields);
+
+  // Check if it's a list
+  let isListValid = incomingData.certifications is list;
+  
+  // Validate list size
+  let isListSizeValid = isListValid && 
+    incomingData.certifications.size() ==0; 
+    
+  return hasNoExtraData &&
+         isListValid &&
+         isListSizeValid;}
+
+// UPDATE
+function isTutorCertificationsUpdateAllowed() {
+  let incomingData = getIncomingData();
+  
+  // Only allow updating the certifications list
+  let validAttributes = request.resource.data.diff(resource.data)
+    .affectedKeys().hasOnly(['certifications']);
+    
+  // Reuse the creation validation
+  // let isValidData = isTutorCertificationsCreateAllowed();
+  return true;
+  // return validAttributes;
+}
+  }
+}
